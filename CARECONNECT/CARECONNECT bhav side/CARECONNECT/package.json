@@ -1,0 +1,17 @@
+{
+  "name": "careconnect-maharashtra",
+  "version": "0.1.0",
+  "description": "Referral-continuity layer for rural healthcare in Maharashtra",
+  "private": true,
+  "scripts": {
+    "client:install": "cd client && npm install",
+    "server:install": "cd server && npm install",
+    "install-all": "npm run client:install && npm run server:install",
+    "client:dev": "cd client && npm run dev",
+    "server:dev": "cd server && npm run dev",
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

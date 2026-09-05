@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clinical Referral Bridge</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #18252b; background: #eef3f1; }
+    body { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+    header { border-bottom: 1px solid #c6d5d0; margin-bottom: 18px; }
+    h1 { margin: 0 0 6px; font-size: 1.55rem; } p { margin: 0 0 18px; color: #52635f; }
+    #messages { min-height: 360px; background: white; border: 1px solid #c6d5d0; padding: 14px; overflow-y: auto; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 10px; } select { flex: 1; padding: 9px; border: 1px solid #9eb5ae; background: white; }
+    .message { margin: 10px 0; padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; }
+    .user { background: #e3f1ec; margin-left: 12%; } .assistant { background: #f5f7f6; margin-right: 12%; }
+    form { display: flex; gap: 8px; margin-top: 12px; } textarea { flex: 1; min-height: 70px; padding: 10px; resize: vertical; border: 1px solid #9eb5ae; }
+    button { background: #176b5b; color: white; border: 0; padding: 0 18px; cursor: pointer; border-radius: 4px; } button:disabled { opacity: .55; }
+    .meta { font-size: .85rem; color: #60736d; margin: 12px 0; } .error { color: #a42d22; }
+  </style>
+</head>
+<body>
+  <header><h1>Rural Clinical Referral Bridge</h1><p>Multilingual clinical decision support for English, Hindi, and Marathi.</p></header>
+  <main>
+    <div class="toolbar"><select id="conversation" aria-label="Saved conversations"></select><button id="new-conversation" type="button">New conversation</button></div>
+    <section id="messages" aria-live="polite"><div class="meta">Describe the patient's situation. A qualified clinician makes the final decision.</div></section>
+    <div id="status" class="meta" role="status"></div>
+    <form id="chat-form"><textarea id="message" required maxlength="6000" placeholder="Describe symptoms or ask a clinical reference question..."></textarea><button id="send" type="submit">Send</button></form>
+  </main>
+  <script>
+    const messages = document.querySelector('#messages');
+    const form = document.querySelector('#chat-form');
+    const input = document.querySelector('#message');
+    const status = document.querySelector('#status');
+    let conversationId = null;
+    const conversationSelect = document.querySelector('#conversation');
+    const newConversation = document.querySelector('#new-conversation');
+    function addMessage(role, text) { const item = document.createElement('div'); item.className = `message ${role}`; item.textContent = text; messages.appendChild(item); messages.scrollTop = messages.scrollHeight; }
+    async function loadConversations() {
+      const data = await fetch('/api/v1/conversations').then(response => response.json());
+      conversationSelect.innerHTML = data.conversations.map(item => `<option value="${item.id}">${item.title} (${new Date(item.updated_at).toLocaleString()})</option>`).join('');
+      if (data.conversations.length) { conversationId = Number(conversationSelect.value); await loadConversation(); }
+    }
+    async function loadConversation() {
+      if (!conversationId) return;
+      const data = await fetch(`/api/v1/conversations/${conversationId}`).then(response => response.json());
+      messages.innerHTML = ''; data.messages.forEach(item => addMessage(item.role, item.role === 'assistant' ? formatResult(JSON.parse(item.content)) : item.content));
+    }
+    function formatResult(result) { return `${result.priority} priority | ${result.suggested_care_level}\n${result.reasoning}\n\nNext: ${result.recommended_next_action}\n\nCaution: ${result.caution}`; }
+    newConversation.addEventListener('click', async () => { const data = await fetch('/api/v1/conversations', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}) }).then(response => response.json()); conversationId = data.conversation_id; await loadConversations(); conversationSelect.value = conversationId; messages.innerHTML = ''; });
+    conversationSelect.addEventListener('change', async () => { conversationId = Number(conversationSelect.value); await loadConversation(); });
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault(); const text = input.value.trim(); if (!text) return;
+      addMessage('user', text); input.value = ''; status.textContent = 'Assessing...'; form.querySelector('button').disabled = true;
+      try {
+        const response = await fetch('/api/v1/triage/assess', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, conversation_id: conversationId }) });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Request failed');
+        conversationId = data.conversation_id; const result = data.result; const answer = `${formatResult(result)}${data.used_fallback ? '\n\nProvider unavailable: deterministic safety fallback used.' : ''}`;
+        addMessage('assistant', answer); status.textContent = data.retrieved_context.length ? `Used ${data.retrieved_context.length} approved reference result(s).` : 'No approved reference matched this message.'; await loadConversations(); conversationSelect.value = conversationId;
+      } catch (error) { status.textContent = error.message; status.className = 'meta error'; }
+      finally { form.querySelector('button').disabled = false; input.focus(); }
+    });
+    loadConversations().catch(error => { status.textContent = error.message; status.className = 'meta error'; });
+  </script>
+</body>
+</html>
