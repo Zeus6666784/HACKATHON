@@ -10,22 +10,13 @@ const router = Router();
 router.use(requireAuth);
 
 const transitions: Record<string, string[]> = {
-  CREATED: ["TRIAGED", "CANCELLED"],
-  TRIAGED: ["FACILITY_SELECTED", "CANCELLED"],
-  FACILITY_SELECTED: ["REFERRAL_SENT", "CANCELLED"],
-  REFERRAL_SENT: ["REFERRAL_ACCEPTED", "REFERRAL_REJECTED"],
-  REFERRAL_ACCEPTED: ["PATIENT_ARRIVED"],
-  REFERRAL_REJECTED: [],
-  PATIENT_ARRIVED: ["CONSULTATION_COMPLETED"],
-  CONSULTATION_COMPLETED: ["DIAGNOSTIC_PENDING", "DIAGNOSTIC_COMPLETED", "FOLLOW_UP_REQUIRED", "CLOSED"],
-  DIAGNOSTIC_PENDING: ["DIAGNOSTIC_COMPLETED"],
-  DIAGNOSTIC_COMPLETED: ["FOLLOW_UP_REQUIRED", "CLOSED"],
-  FOLLOW_UP_REQUIRED: ["FOLLOW_UP_COMPLETED", "OVERDUE", "LOST_TO_FOLLOWUP"],
-  FOLLOW_UP_COMPLETED: ["CLOSED"],
-  OVERDUE: ["FOLLOW_UP_COMPLETED", "LOST_TO_FOLLOWUP"],
-  LOST_TO_FOLLOWUP: ["CLOSED"],
+  SUBMITTED: ["ACCEPTED", "CANCELLED"],
+  ACCEPTED: ["BED RESERVED", "CANCELLED"],
+  "BED RESERVED": ["IN TRANSIT", "CANCELLED"],
+  "IN TRANSIT": ["ARRIVED", "CANCELLED"],
+  ARRIVED: ["COMPLETED", "CANCELLED"],
+  COMPLETED: [],
   CANCELLED: [],
-  CLOSED: []
 };
 
 router.post("/", requireRoles("DOCTOR", "HEALTH_WORKER"), async (req: AuthRequest, res, next) => {
@@ -35,8 +26,8 @@ router.post("/", requireRoles("DOCTOR", "HEALTH_WORKER"), async (req: AuthReques
       patientId: z.string(),
       fromFacilityId: z.string(),
       toFacilityId: z.string(),
-      priority: z.enum(["HIGH", "MEDIUM", "LOW"]),
-      careLevel: z.enum(["PHC", "DISTRICT", "TERTIARY"])
+      urgency: z.enum(["EMERGENCY", "URGENT", "ROUTINE"]),
+      requiredSpecialty: z.string(),
     }).parse(req.body);
 
     // IDOR check: ensuring fromFacilityId matches user's facility
@@ -44,14 +35,17 @@ router.post("/", requireRoles("DOCTOR", "HEALTH_WORKER"), async (req: AuthReques
       return res.status(403).json({ success: false, error: "You can only create referrals from your own facility" });
     }
 
-    const referral = await Referral.create(data);
+    const referral = await Referral.create({
+      ...data,
+      status: "SUBMITTED"
+    });
     await ReferralEvent.create({
       event_id: crypto.randomUUID(),
       referral_id: referral.id,
       event_type: "REFERRAL_CREATED",
       performed_by: req.user!.id,
       previous_status: undefined,
-      new_status: "CREATED",
+      new_status: "SUBMITTED",
       notes: "Referral created"
     });
 
@@ -80,8 +74,7 @@ router.get("/stats", requireRoles("DOCTOR", "FACILITY_STAFF", "ADMIN"), async (r
       const updatedAt = new Date(r.updatedAt);
       const diffDays = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24);
 
-      if ((r.status === "FOLLOW_UP_REQUIRED" && diffDays > 7) ||
-          (r.status === "REFERRAL_SENT" && diffDays > 3)) {
+      if (r.status !== "COMPLETED" && diffDays > 3) {
         stats.overdue++;
       }
     });
@@ -132,7 +125,7 @@ router.patch("/:id/reassign", requireRoles("DOCTOR", "HEALTH_WORKER"), async (re
       return res.status(403).json({ success: false, error: "Only the referring facility can reassign" });
     }
 
-    if (referral.status === "REFERRAL_ACCEPTED" || referral.status === "CLOSED") {
+    if (referral.status === "ACCEPTED" || referral.status === "COMPLETED") {
       return res.status(409).json({ success: false, error: "Cannot reassign an accepted or closed referral" });
     }
 
@@ -141,7 +134,7 @@ router.patch("/:id/reassign", requireRoles("DOCTOR", "HEALTH_WORKER"), async (re
       return res.status(400).json({ success: false, error: "Invalid facility ID format" });
     }
     referral.toFacilityId = new mongoose.Types.ObjectId(data.toFacilityId);
-    referral.status = "FACILITY_SELECTED"; // Reset to selection state
+    referral.status = "SUBMITTED"; // Reset to the first state of the linear flow
 
     await referral.save();
 
@@ -151,7 +144,7 @@ router.patch("/:id/reassign", requireRoles("DOCTOR", "HEALTH_WORKER"), async (re
       event_type: "REFERRAL_REASSIGNED",
       performed_by: req.user!.id,
       previous_status: previousStatus,
-      new_status: "FACILITY_SELECTED",
+      new_status: "SUBMITTED",
       notes: `Reassigned to ${data.toFacilityId}. ${data.notes ?? ""}`
     });
 
@@ -174,12 +167,12 @@ router.patch("/:id/close", requireRoles("DOCTOR"), async (req: AuthRequest, res,
       return res.status(403).json({ success: false, error: "You are not authorized to close this referral" });
     }
 
-    if (referral.status === "CLOSED") {
+    if (referral.status === "COMPLETED") {
       return res.status(409).json({ success: false, error: "Referral is already closed" });
     }
 
     const previousStatus = referral.status;
-    referral.status = "CLOSED";
+    referral.status = "COMPLETED";
     await referral.save();
 
     await ReferralEvent.create({
@@ -188,7 +181,7 @@ router.patch("/:id/close", requireRoles("DOCTOR"), async (req: AuthRequest, res,
       event_type: "REFERRAL_CLOSED",
       performed_by: req.user!.id,
       previous_status: previousStatus,
-      new_status: "CLOSED",
+      new_status: "COMPLETED",
       notes: `Closed. Meds: ${data.medication ?? "None"}. Follow-up: ${data.followUpDate ?? "None"}. Notes: ${data.closureNotes}`
     });
 
@@ -233,6 +226,47 @@ router.patch("/:id/status", requireRoles("DOCTOR", "FACILITY_STAFF"), async (req
     });
 
     await notificationService.notifyReferralStatus(referral.id, data.status, referral.toFacilityId?.toString() || "Unknown");
+
+    res.json({ success: true, data: referral });
+  } catch (e) { next(e); }
+});
+
+router.post("/:id/reserve-bed", requireRoles("DOCTOR", "FACILITY_STAFF"), async (req: AuthRequest, res, next) => {
+  try {
+    const data = z.object({
+      bedId: z.string(),
+    }).parse(req.body);
+
+    const referral = await Referral.findById(req.params.id);
+    if (!referral) return res.status(404).json({ success: false, error: "Referral not found" });
+
+    const { Facility } = require("../models/Facility"); // Avoid circular dep if any
+    const facility = await Facility.findById(referral.toFacilityId);
+    if (!facility) return res.status(404).json({ success: false, error: "Destination facility not found" });
+
+    // Logic to determine which bed type is being reserved (simplification: based on urgency or requiredSpecialty)
+    if (referral.urgency === "EMERGENCY") {
+      if (facility.icuAvailable <= 0) return res.status(409).json({ success: false, error: "No ICU beds available" });
+      facility.icuAvailable -= 1;
+    } else if (referral.urgency === "URGENT") {
+      if (facility.oxygenAvailable <= 0) return res.status(409).json({ success: false, error: "No Oxygen beds available" });
+      facility.oxygenAvailable -= 1;
+    }
+
+    await facility.save();
+    referral.status = "BED RESERVED";
+    referral.reservedBedId = data.bedId;
+    await referral.save();
+
+    await ReferralEvent.create({
+      event_id: crypto.randomUUID(),
+      referral_id: referral.id,
+      event_type: "BED_RESERVED",
+      performed_by: req.user!.id,
+      previous_status: "ACCEPTED",
+      new_status: "BED RESERVED",
+      notes: `Bed ${data.bedId} reserved.`
+    });
 
     res.json({ success: true, data: referral });
   } catch (e) { next(e); }

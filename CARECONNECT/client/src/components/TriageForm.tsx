@@ -25,9 +25,17 @@ export function TriageForm({
   const [chiefComplaint, setChiefComplaint] = useState("");
   const [requiredService, setRequiredService] = useState("maternal");
   const [dangerSigns, setDangerSigns] = useState<string[]>([]);
+  const [vitals, setVitals] = useState({
+    heartRate: "",
+    systolicBP: "",
+    diastolicBP: "",
+    spo2: "",
+    temperature: "",
+    respiratoryRate: "",
+    consciousness: "alert",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ priority: string; recommendedLevel: string; rationale: string; referralId?: string } | null>(null);
 
   function toggleSign(id: string) {
     setDangerSigns((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -39,7 +47,21 @@ export function TriageForm({
     setError("");
     const queued = await postWithQueue(
       "/referrals",
-      { patientId, chiefComplaint, requiredService, dangerSigns },
+      {
+        patientId,
+        chiefComplaint,
+        requiredService,
+        dangerSigns,
+        vitals: {
+          heartRate: Number(vitals.heartRate),
+          systolicBP: Number(vitals.systolicBP),
+          diastolicBP: Number(vitals.diastolicBP),
+          spo2: Number(vitals.spo2),
+          temperature: Number(vitals.temperature),
+          respiratoryRate: Number(vitals.respiratoryRate),
+          consciousness: vitals.consciousness,
+        }
+      },
       "Create triaged referral",
     );
     setBusy(false);
@@ -52,10 +74,7 @@ export function TriageForm({
         referral: { id: string };
         triage: { priority: string; recommendedLevel: string; rationale: string };
       };
-      setResult({
-        ...data.triage,
-        referralId: data.referral.id,
-      });
+      router.push(`/triage-result?id=${data.referral.id}`);
       return;
     }
     setError("Triage could not be saved. Check required fields.");
@@ -109,6 +128,82 @@ export function TriageForm({
             ))}
           </select>
         </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm font-medium">
+            HR (bpm)
+            <input
+              type="number"
+              className="input-inset mt-1 w-full rounded-xl px-3 py-3"
+              value={vitals.heartRate}
+              onChange={e => setVitals({...vitals, heartRate: e.target.value})}
+              required
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            SpO2 (%)
+            <input
+              type="number"
+              className="input-inset mt-1 w-full rounded-xl px-3 py-3"
+              value={vitals.spo2}
+              onChange={e => setVitals({...vitals, spo2: e.target.value})}
+              required
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Systolic BP
+            <input
+              type="number"
+              className="input-inset mt-1 w-full rounded-xl px-3 py-3"
+              value={vitals.systolicBP}
+              onChange={e => setVitals({...vitals, systolicBP: e.target.value})}
+              required
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Diastolic BP
+            <input
+              type="number"
+              className="input-inset mt-1 w-full rounded-xl px-3 py-3"
+              value={vitals.diastolicBP}
+              onChange={e => setVitals({...vitals, diastolicBP: e.target.value})}
+              required
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Temp (°F)
+            <input
+              type="number"
+              step="0.1"
+              className="input-inset mt-1 w-full rounded-xl px-3 py-3"
+              value={vitals.temperature}
+              onChange={e => setVitals({...vitals, temperature: e.target.value})}
+              required
+            />
+          </label>
+          <label className="block text-sm font-medium">
+            Resp Rate
+            <input
+              type="number"
+              className="input-inset mt-1 w-full rounded-xl px-3 py-3"
+              value={vitals.respiratoryRate}
+              onChange={e => setVitals({...vitals, respiratoryRate: e.target.value})}
+              required
+            />
+          </label>
+        </div >
+        <label className="block text-sm font-medium">
+          Consciousness (AVPU)
+          <select
+            className="input-inset mt-1 w-full rounded-xl px-3 py-3"
+            value={vitals.consciousness}
+            onChange={(e) => setVitals({...vitals, consciousness: e.target.value})}
+          >
+            <option value="alert">Alert</option>
+            <option value="verbal">Responds to Voice</option>
+            <option value="pain">Responds to Pain</option>
+            <option value="unresponsive">Unresponsive</option>
+          </select>
+        </label>
         <fieldset>
           <legend className="text-sm font-medium">{t(locale, "dangerSigns")}</legend>
           <div className="mt-2 grid gap-2">
@@ -137,23 +232,6 @@ export function TriageForm({
           {t(locale, "triage")}
         </button>
       </form>
-      {result ? (
-        <section className="card-soft space-y-3 p-5">
-          <h2 className="font-display text-lg font-semibold">{t(locale, "noDiagnosis")}</h2>
-          <PriorityBadge priority={result.priority} locale={locale} />
-          <p className="text-sm">Recommended public care level: {result.recommendedLevel}</p>
-          <p className="text-sm leading-relaxed text-cyan-900">{result.rationale}</p>
-          {result.referralId ? (
-            <button
-              type="button"
-              onClick={() => router.push(`/referrals/view?id=${result.referralId}`)}
-              className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-accent font-semibold text-white"
-            >
-              {t(locale, "findFacility")}
-            </button>
-          ) : null}
-        </section>
-      ) : null}
     </div>
   );
 }

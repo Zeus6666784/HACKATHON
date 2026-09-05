@@ -7,6 +7,7 @@ import { StatusBadge, PriorityBadge, SyntheticMark } from "@/components/StatusBa
 import { JourneyRail } from "@/components/JourneyRail";
 import { AdvanceControls } from "@/components/AdvanceControls";
 import { FacilityPicker } from "@/components/FacilityPicker";
+import { ReferralTimeline } from "@/components/ReferralTimeline";
 import { levelLabel, serviceLabel } from "@/lib/labels";
 import { isOverdue } from "@/lib/referrals";
 import { useAuth } from "@/context/AuthContext";
@@ -98,20 +99,7 @@ export default function ReferralDetailPage() {
         <AdvanceControls referralId={referral.id} status={referral.status} locale={locale} />
       ) : null}
 
-      <section className="card-soft p-5">
-        <h2 className="font-display text-lg font-semibold">{t(locale, "timeline")}</h2>
-        <ol className="mt-3 space-y-3">
-          {referral.events?.map((e: any) => (
-            <li key={e.id} className="border-l-2 border-primary/40 pl-3">
-              <p className="text-sm font-semibold">{e.toStatus}</p>
-              <p className="text-sm text-cyan-900">{e.note}</p>
-              <p className="text-[11px] text-cyan-700">
-                {e.actorName} · {new Date(e.createdAt).toLocaleString()}
-              </p>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <ReferralTimeline events={referral.events} locale={locale} />
     </div>
   );
 }

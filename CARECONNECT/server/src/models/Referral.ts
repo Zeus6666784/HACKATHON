@@ -1,11 +1,7 @@
 import { Schema, model } from "mongoose";
 
 export const REFERRAL_STATES = [
-  "CREATED", "TRIAGED", "FACILITY_SELECTED", "REFERRAL_SENT",
-  "REFERRAL_ACCEPTED", "REFERRAL_REJECTED", "PATIENT_ARRIVED",
-  "CONSULTATION_COMPLETED", "DIAGNOSTIC_PENDING", "DIAGNOSTIC_COMPLETED",
-  "FOLLOW_UP_REQUIRED", "FOLLOW_UP_COMPLETED", "OVERDUE",
-  "LOST_TO_FOLLOWUP", "CANCELLED", "CLOSED"
+  "SUBMITTED", "ACCEPTED", "BED RESERVED", "IN TRANSIT", "ARRIVED", "COMPLETED"
 ] as const;
 
 const referralSchema = new Schema({
@@ -13,9 +9,12 @@ const referralSchema = new Schema({
   patientId: { type: Schema.Types.ObjectId, ref: "Patient", required: true },
   fromFacilityId: { type: Schema.Types.ObjectId, ref: "Facility", required: true },
   toFacilityId: { type: Schema.Types.ObjectId, ref: "Facility", required: true },
-  status: { type: String, enum: REFERRAL_STATES, default: "CREATED" },
-  priority: { type: String, enum: ["HIGH", "MEDIUM", "LOW"], required: true },
-  careLevel: { type: String, enum: ["PHC", "DISTRICT", "TERTIARY"], required: true }
+  status: { type: String, enum: REFERRAL_STATES, default: "SUBMITTED" },
+  urgency: { type: String, enum: ["EMERGENCY", "URGENT", "ROUTINE"], required: true },
+  requiredSpecialty: { type: String, required: true },
+  reservedBedId: { type: String },
+  ambulanceId: { type: String },
+  ambulanceDriver: { type: String },
 }, { timestamps: true });
 
 export const Referral = model("Referral", referralSchema);

@@ -22,6 +22,7 @@ const dict = {
     newReferral: "Start referral",
     triage: "AI-assisted triage",
     map: "Nearby facilities",
+    ambulanceTracking: "Ambulance Tracking",
     audit: "Audit log",
     logout: "Sign out",
     synthetic: "SYNTHETIC DEMO DATA",
@@ -112,6 +113,8 @@ const dict = {
     completedHint: "Reached consultation or later.",
     pendingHint: "Open referrals not yet closed.",
     closedHint: "Journey completed and closed.",
+    profile: "Profile",
+    profileSubtitle: "Manage your account details",
   },
   hi: {
     appName: "केयरकनेक्ट महाराष्ट्र",
@@ -134,6 +137,7 @@ const dict = {
     newReferral: "रेफरल शुरू करें",
     triage: "एआई-सहायता प्राप्त ट्राइएज",
     map: "नज़दीकी सुविधाएँ",
+    ambulanceTracking: "एम्बुलेंस ट्रैकिंग",
     audit: "ऑडिट लॉग",
     logout: "साइन आउट",
     synthetic: "कृत्रिम डेमो डेटा",
@@ -224,6 +228,8 @@ const dict = {
     completedHint: "परामर्श या उसके बाद तक पहुँचा।",
     pendingHint: "अभी बंद नहीं हुए खुले रेफरल।",
     closedHint: "यात्रा पूरी होकर बंद।",
+    profile: "प्रोफ़ाइल",
+    profileSubtitle: "अपने खाते का विवरण प्रबंधित करें",
   },
   mr: {
     appName: "केअरकनेक्ट महाराष्ट्र",
@@ -246,6 +252,7 @@ const dict = {
     newReferral: "रेफरल सुरू करा",
     triage: "एआय-सहाय्यित ट्रायज",
     map: "जवळच्या सुविधा",
+    ambulanceTracking: "रुग्णवाहिका ट्रॅकिंग",
     audit: "ऑडिट लॉग",
     logout: "साइन आउट",
     synthetic: "कृत्रिम डेमो डेटा",
@@ -336,6 +343,8 @@ const dict = {
     completedHint: "तपासणी किंवा पुढे पोहोचले.",
     pendingHint: "अजून बंद न झालेले रेफरल.",
     closedHint: "प्रवास पूर्ण होऊन बंद.",
+    profile: "प्रोफ़ाइल",
+    profileSubtitle: "तुमच्या खात्याचा तपशील व्यवस्थापित करा",
   },
 } as const;
 

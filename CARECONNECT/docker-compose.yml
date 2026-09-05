@@ -1,18 +1,14 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:latest
     container_name: careconnect-db
-    ports:
-      - "27017:27017"
     volumes:
       - mongodb_data:/data/db
 
-  backend:
+  app:
     build:
       context: .
-      dockerfile: Dockerfile.server
+      dockerfile: Dockerfile.unified
     container_name: careconnect-app
     ports:
       - "5000:5000"
@@ -25,19 +21,6 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY}
     depends_on:
       - mongodb
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.client
-    container_name: careconnect-frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - MONGODB_URI=mongodb://mongodb:27017/careconnect
-    depends_on:
-      - backend
 
 volumes:
   mongodb_data:

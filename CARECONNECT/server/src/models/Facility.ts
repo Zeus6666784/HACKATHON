@@ -7,6 +7,12 @@ const facilitySchema = new Schema({
   services: { type: [String], default: [] },
   specialists: { type: [String], default: [] },
   emergencyCapability: { type: Boolean, default: false },
+  icuBeds: { type: Number, default: 0 },
+  icuAvailable: { type: Number, default: 0 },
+  oxygenBeds: { type: Number, default: 0 },
+  oxygenAvailable: { type: Number, default: 0 },
+  ventilators: { type: Number, default: 0 },
+  ventilatorsAvailable: { type: Number, default: 0 },
   verificationState: {
     type: String,
     enum: ["VERIFIED", "UNVERIFIED", "UNKNOWN", "SYNTHETIC"],

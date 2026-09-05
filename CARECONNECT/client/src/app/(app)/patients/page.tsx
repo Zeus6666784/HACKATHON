@@ -52,7 +52,7 @@ export default function PatientsPage() {
             {p.healthId} · {t(locale, "age")} {p.age} · {p.village}, {p.taluka}
           </p>
           <p className="text-xs text-cyan-700">{p.referralCount || 0} referrals</p>
-          <Link href={`/triage?patientId=${p.id}`} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary">
+          <Link href={`/clinical-intake?patientId=${p.id}`} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary">
             {t(locale, "newReferral")}
           </Link>
         </article>

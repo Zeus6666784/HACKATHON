@@ -34,6 +34,7 @@ export function AppShell({
     { href: "/referrals", label: t(locale, "referrals"), icon: ClipboardList, roles: Object.values(ROLES) },
     { href: "/patients", label: t(locale, "patients"), icon: Users, roles: [ROLES.ADMIN, ROLES.HEALTH_WORKER, ROLES.FACILITY_STAFF] },
     { href: "/facilities", label: t(locale, "map"), icon: MapPinned, roles: Object.values(ROLES) },
+    { href: "/ambulance", label: t(locale, "ambulanceTracking"), icon: Activity, roles: [ROLES.ADMIN, ROLES.FACILITY_STAFF] },
     { href: "/triage", label: t(locale, "newReferral"), icon: Activity, roles: [ROLES.ADMIN, ROLES.HEALTH_WORKER, ROLES.FACILITY_STAFF] },
   ].filter((i) => i.roles.includes(user.role));
 
@@ -119,12 +120,7 @@ export function AppShell({
               );
             })}
             {user.role === ROLES.ADMIN ? (
-              <li>
-                <Link href="/audit" className="flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm text-cyan-900">
-                  <Hospital className="h-4 w-4" />
-                  {t(locale, "audit")}
-                </Link>
-              </li>
+              null
             ) : null}
           </ul>
         </div>
