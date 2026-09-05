@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { t } from "@/lib/i18n";
 import { StatusBadge, PriorityBadge, SyntheticMark } from "@/components/StatusBadge";
 import { JourneyRail } from "@/components/JourneyRail";
