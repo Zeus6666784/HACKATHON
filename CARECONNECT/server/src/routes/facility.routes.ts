@@ -2,7 +2,7 @@ import { Router } from "express";
 import { Facility } from "../models/Facility";
 import { Patient } from "../models/Patient";
 import { calculateDistance } from "../utils/geo";
-import { requireAuth, requireRoles } from "../middleware/auth";
+import { requireAuth, requireRoles, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 
 const router = Router();
@@ -15,7 +15,7 @@ router.get("/", async (_req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.get("/rank", requireRoles("DOCTOR", "HEALTH_WORKER"), async (req, res, next) => {
+router.get("/rank", requireRoles("DOCTOR", "HEALTH_WORKER"), async (req: AuthRequest, res, next) => {
   try {
     const query = z.object({
       patientId: z.string(),
@@ -25,6 +25,10 @@ router.get("/rank", requireRoles("DOCTOR", "HEALTH_WORKER"), async (req, res, ne
 
     const patient = await Patient.findById(query.patientId);
     if (!patient) return res.status(404).json({ success: false, error: "Patient not found" });
+
+    if (!req.user?.facilityId || String(patient.facilityId) !== String(req.user.facilityId)) {
+      return res.status(403).json({ success: false, error: "You are not authorized to access this patient's data" });
+    }
 
     const symptoms = String(query.symptoms ?? "").toLowerCase();
     const isEmergency = query.isEmergency === "true";

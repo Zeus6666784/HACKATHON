@@ -10,14 +10,16 @@ export type TriageResult = {
 
 import { SafetyValidator } from "./safety.service";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 import { env } from "../config/env";
+import { buildAIContext } from "./context.service";
 
 interface AIProvider {
-  assess(symptoms: string): Promise<TriageResult>;
+  assess(symptoms: string, context: any): Promise<TriageResult>;
 }
 
 class FallbackProvider implements AIProvider {
-  async assess(symptoms: string): Promise<TriageResult> {
+  async assess(symptoms: string, _context: any): Promise<TriageResult> {
     const text = symptoms.toLowerCase();
     const highSignals = ["unconscious", "severe bleeding", "chest pain", "difficulty breathing", "stroke", "seizure"];
     const high = highSignals.some((x) => text.includes(x));
@@ -61,10 +63,10 @@ class GeminiProvider implements AIProvider {
 
     STRICT RULES:
     1. You provide DECISION SUPPORT only.
-    2. NEVER diagnose a disease (e.g., do not say "Patient has Pneumonia").
+    2. NEVER diagnose a disease.
     3. NEVER prescribe medication or dosage.
-    4. NEVER claim a confirmed diagnosis or absolute certainty.
-    5. Use "Danger Signs" to determine urgency.
+    4. NEVER claim a confirmed diagnosis.
+    5. Use "Danger Signs" and provided context to determine urgency.
 
     OUTPUT SCHEMA:
     {
@@ -77,33 +79,69 @@ class GeminiProvider implements AIProvider {
     }
   `;
 
-  async assess(symptoms: string): Promise<TriageResult> {
-    const prompt = `${this.systemPrompt}\n\nPatient Symptoms: ${symptoms}`;
+  async assess(symptoms: string, context: any): Promise<TriageResult> {
+    const prompt = `${this.systemPrompt}\n\nApproved Guidelines:\n${context.ragContext}\n\nPatient Data: ${JSON.stringify(context.patientData)}\n\nSymptoms: ${symptoms}`;
     const result = await this.model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
-
+    const text = result.response.text();
     const parsed = JSON.parse(text);
+    return { ...parsed, source: "AI" };
+  }
+}
 
-    return {
-      ...parsed,
-      source: "AI"
-    };
+class GroqProvider implements AIProvider {
+  private groq = new Groq({ apiKey: env.groqApiKey || "" });
+
+  private systemPrompt = `
+    You are a medical triage assistant for CareConnect Maharashtra.
+    Your goal is to analyze symptoms and suggest the priority and care level.
+
+    STRICT RULES:
+    1. You provide DECISION SUPPORT only.
+    2. NEVER diagnose a disease.
+    3. NEVER prescribe medication or dosage.
+    4. NEVER claim a confirmed diagnosis.
+    5. Use "Danger Signs" and provided context to determine urgency.
+
+    OUTPUT SCHEMA (Return ONLY JSON):
+    {
+      "priority": "HIGH" | "MEDIUM" | "LOW",
+      "suggestedCareLevel": "PHC" | "DISTRICT" | "TERTIARY",
+      "relevantServices": ["Service A", "Service B"],
+      "reasoning": "Explain based on urgency and symptoms.",
+      "recommendedNextAction": "Next clinical step.",
+      "caution": "Mandatory safety disclaimer."
+    }
+  `;
+
+  async assess(symptoms: string, context: any): Promise<TriageResult> {
+    const chatCompletion = await this.groq.chat.completions.create({
+      messages: [
+        { role: "system", content: this.systemPrompt },
+        { role: "user", content: `Context:\n${context.ragContext}\n\nPatient: ${JSON.stringify(context.patientData)}\n\nSymptoms: ${symptoms}` },
+      ],
+      model: "llama3-8b-8192",
+      response_format: { type: "json_object" },
+    });
+
+    const text = chatCompletion.choices[0]?.message?.content || "{}";
+    const parsed = JSON.parse(text);
+    return { ...parsed, source: "AI" };
   }
 }
 
 const providers: Record<string, AIProvider> = {
   fallback: new FallbackProvider(),
   gemini: new GeminiProvider(),
+  groq: new GroqProvider(),
 };
 
-export async function assessTriage(symptoms: string): Promise<TriageResult> {
+export async function assessTriage(symptoms: string, patientId: string): Promise<TriageResult> {
   const fallbackProvider = providers["fallback"];
 
   try {
-    // Use the live Gemini provider. If API key is missing or fails, it hits the catch block.
-    const provider = providers["gemini"];
-    const result = await provider.assess(symptoms);
+    const context = await buildAIContext(patientId);
+    const provider = providers["groq"];
+    const result = await provider.assess(symptoms, context);
 
     const validation = SafetyValidator.validate(result);
     if (validation.safe) {
@@ -115,5 +153,5 @@ export async function assessTriage(symptoms: string): Promise<TriageResult> {
     console.error("AI Provider Error (Falling back):", e);
   }
 
-  return await fallbackProvider.assess(symptoms);
+  return await fallbackProvider.assess(symptoms, {});
 }

@@ -6,5 +6,6 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET ?? "change-me",
   nodeEnv: process.env.NODE_ENV ?? "development",
   llmApiKey: process.env.LLM_API_KEY ?? "",
-  geminiApiKey: process.env.GEMINI_API_KEY ?? ""
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  groqApiKey: process.env.GROQ_API_KEY ?? ""
 };

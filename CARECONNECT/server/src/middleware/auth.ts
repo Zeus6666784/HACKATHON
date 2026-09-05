@@ -13,9 +13,11 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   if (!token) return res.status(401).json({ success: false, error: "Authentication required" });
 
   try {
+    console.log("Verifying token:", token);
     req.user = jwt.verify(token, env.jwtSecret) as AuthRequest["user"];
     next();
-  } catch {
+  } catch (e) {
+    console.error("JWT Verify Error:", e);
     return res.status(401).json({ success: false, error: "Invalid or expired session" });
   }
 }

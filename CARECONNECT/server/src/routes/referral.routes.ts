@@ -137,7 +137,10 @@ router.patch("/:id/reassign", requireRoles("DOCTOR", "HEALTH_WORKER"), async (re
     }
 
     const previousStatus = referral.status;
-    referral.toFacilityId = data.toFacilityId;
+    if (!mongoose.Types.ObjectId.isValid(data.toFacilityId)) {
+      return res.status(400).json({ success: false, error: "Invalid facility ID format" });
+    }
+    referral.toFacilityId = new mongoose.Types.ObjectId(data.toFacilityId);
     referral.status = "FACILITY_SELECTED"; // Reset to selection state
 
     await referral.save();
@@ -166,6 +169,10 @@ router.patch("/:id/close", requireRoles("DOCTOR"), async (req: AuthRequest, res,
 
     const referral = await Referral.findById(req.params.id);
     if (!referral) return res.status(404).json({ success: false, error: "Referral not found" });
+
+    if (req.user?.role !== "ADMIN" && String(referral.toFacilityId) !== String(req.user?.facilityId)) {
+      return res.status(403).json({ success: false, error: "You are not authorized to close this referral" });
+    }
 
     if (referral.status === "CLOSED") {
       return res.status(409).json({ success: false, error: "Referral is already closed" });
