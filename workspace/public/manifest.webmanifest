@@ -1,0 +1,18 @@
+{
+  "name": "CareConnect Maharashtra",
+  "short_name": "CareConnect MH",
+  "description": "Rural referral tracking and continuity of care for Palghar district.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ecfeff",
+  "theme_color": "#0891b2",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

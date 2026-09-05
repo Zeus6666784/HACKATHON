@@ -13,7 +13,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.server
-    container_name: careconnect-server
+    container_name: careconnect-app
     ports:
       - "5000:5000"
     environment:
@@ -30,11 +30,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.client
-      args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost:5000/api/v1}
-    container_name: careconnect-client
+    container_name: careconnect-frontend
     ports:
-      - "80:80"
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/careconnect
     depends_on:
       - backend
 

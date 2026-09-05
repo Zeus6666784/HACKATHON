@@ -1,0 +1,25 @@
+# Build Client
+FROM node:20-slim AS client-build
+WORKDIR /app
+COPY client/package*.json ./
+RUN npm install
+COPY client/ .
+RUN npx prisma generate --schema=./prisma/schema.prisma
+RUN npm run build
+
+# Build Server
+FROM node:20-slim AS server-build
+WORKDIR /app
+COPY server/package*.json ./
+RUN npm install
+COPY server/ .
+RUN npm run build
+
+# Final Production Stage
+FROM node:20-slim
+WORKDIR /app
+COPY --from=server-build /app/dist ./dist
+COPY --from=server-build /app/node_modules ./node_modules
+COPY --from=client-build /app/out ./client/dist
+EXPOSE 5000
+CMD ["node", "dist/index.js"]

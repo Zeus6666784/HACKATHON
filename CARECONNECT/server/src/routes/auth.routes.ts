@@ -51,4 +51,12 @@ router.post("/logout", (_req, res) => {
   res.json({ success: true, data: null });
 });
 
+router.get("/me", async (req: any, res, next) => {
+  try {
+    const user = await User.findById(req.user?.id).select("-password");
+    if (!user) return res.status(401).json({ success: false, error: "Unauthorized" });
+    res.json({ success: true, data: user });
+  } catch (e) { next(e); }
+});
+
 export default router;

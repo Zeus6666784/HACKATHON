@@ -12,7 +12,12 @@ router.post("/assess", async (req: AuthRequest, res, next) => {
   try {
     const data = z.object({
       patientId: z.string().min(1),
-      symptoms: z.string().min(3).max(5000)
+      triageInput: z.object({
+        chiefComplaint: z.string().min(1),
+        dangerSigns: z.array(z.string()),
+        requiredService: z.string(),
+        vitals: z.any().optional()
+      })
     }).parse(req.body);
 
     const patient = await Patient.findOne({ patientId: data.patientId });
@@ -22,15 +27,14 @@ router.post("/assess", async (req: AuthRequest, res, next) => {
       return res.status(403).json({ success: false, error: "You are not authorized to assess this patient" });
     }
 
-    const result = await assessTriage(data.symptoms, data.patientId);
+    const result = await assessTriage(data.triageInput, data.patientId);
     const saved = await TriageAssessment.create({
       patientId: data.patientId,
-      symptoms: data.symptoms,
+      symptoms: JSON.stringify(data.triageInput),
       aiPriority: result.priority,
-      suggestedCareLevel: result.suggestedCareLevel,
-      reasoning: result.reasoning,
-      recommendedNextAction: result.recommendedNextAction,
-      caution: result.caution,
+      suggestedCareLevel: result.recommendedLevel,
+      reasoning: result.rationale,
+      caution: result.disclaimer,
       doctorId: req.user?.id
     });
 

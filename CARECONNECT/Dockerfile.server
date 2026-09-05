@@ -1,17 +1,8 @@
-# Build stage
-FROM node:20-slim AS build
+FROM node:20-slim
 WORKDIR /app
 COPY server/package*.json ./
 RUN npm install
-COPY server/ ./
+COPY server/ .
 RUN npm run build
-
-# Runtime stage
-FROM node:20-slim
-WORKDIR /app
-COPY --from=build /app/package*.json ./
-RUN npm install --omit=dev
-COPY --from=build /app/dist ./dist
-
 EXPOSE 5000
 CMD ["node", "dist/index.js"]

@@ -1,34 +1,61 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-import { post } from "../services/api";
-import type { Role } from "../types";
+"use client";
 
-type User = { id: string; name: string; role: Role };
-type AuthContextValue = {
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { get } from "@/lib/api";
+
+export type SessionUser = {
+  id: string;
+  username: string;
+  fullName: string;
+  role: string;
+  locale: string;
+  facilityId: string | null;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+interface AuthContextType {
+  session: SessionUser | null;
+  loading: boolean;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+}
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-  async function login(email: string, password: string) {
-    const data = await post<User>("/auth/login", { email, password });
-    setUser(data);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<SessionUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function refreshSession() {
+    try {
+      const data = await get("/auth/me");
+      setSession(data);
+    } catch {
+      setSession(null);
+    } finally {
+      setLoading(false);
+    }
   }
+
+  useEffect(() => {
+    refreshSession();
+  }, []);
 
   async function logout() {
-    await post("/auth/logout");
-    setUser(null);
+    try {
+      await get("/auth/logout"); // Using GET for simplicity or just clear cookie
+    } catch {}
+    setSession(null);
   }
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ session, loading, logout, refreshSession }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
+  return context;
 }

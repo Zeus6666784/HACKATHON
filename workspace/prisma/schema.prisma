@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  username     String     @unique
+  passwordHash String
+  fullName     String
+  role         String
+  locale       String     @default("en")
+  phone        String?
+  village      String?
+  facilityId   String?
+  facility     Facility?  @relation(fields: [facilityId], references: [id])
+  isSynthetic  Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  patients     Patient[]  @relation("RegisteredBy")
+  linkedPatient Patient?  @relation("PatientAccount")
+  referralsCreated Referral[] @relation("CreatedBy")
+  auditLogs    AuditLog[]
+}
+
+model Patient {
+  id              String     @id @default(cuid())
+  healthId        String     @unique
+  fullName        String
+  age             Int
+  sex             String
+  phone           String?
+  village         String
+  taluka          String
+  district        String     @default("Palghar")
+  latitude        Float?
+  longitude       Float?
+  caregiverName   String?
+  registeredById  String
+  registeredBy    User       @relation("RegisteredBy", fields: [registeredById], references: [id])
+  accountUserId   String?    @unique
+  accountUser     User?      @relation("PatientAccount", fields: [accountUserId], references: [id])
+  isSynthetic     Boolean    @default(true)
+  referrals       Referral[]
+  createdAt       DateTime   @default(now())
+}
+
+model Facility {
+  id          String     @id @default(cuid())
+  name        String
+  careLevel   String
+  taluka      String
+  district    String     @default("Palghar")
+  village     String?
+  latitude    Float
+  longitude   Float
+  phone       String?
+  services    String
+  osmId       String?
+  isPublic    Boolean    @default(true)
+  isSynthetic Boolean    @default(true)
+  staff       User[]
+  incoming    Referral[] @relation("ToFacility")
+  outgoing    Referral[] @relation("FromFacility")
+}
+
+model Referral {
+  id                 String          @id @default(cuid())
+  publicId           String          @unique
+  patientId          String
+  patient            Patient         @relation(fields: [patientId], references: [id])
+  createdById        String
+  createdBy          User            @relation("CreatedBy", fields: [createdById], references: [id])
+  fromFacilityId     String?
+  fromFacility       Facility?       @relation("FromFacility", fields: [fromFacilityId], references: [id])
+  toFacilityId       String?
+  toFacility         Facility?       @relation("ToFacility", fields: [toFacilityId], references: [id])
+  status             String          @default("CREATED")
+  priority           String?
+  requiredService    String
+  chiefComplaint     String
+  dangerSigns        String
+  triageRationale    String?
+  recommendedLevel   String?
+  appointmentAt      DateTime?
+  consultationNotes  String?
+  diagnosticsNotes   String?
+  followUpNotes      String?
+  closureNotes       String?
+  dueAt              DateTime?
+  closedAt           DateTime?
+  isSynthetic        Boolean         @default(true)
+  events             ReferralEvent[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model ReferralEvent {
+  id          String   @id @default(cuid())
+  referralId  String
+  referral    Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  fromStatus  String?
+  toStatus    String
+  actorName   String?
+  note        String?
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  detail    String?
+  createdAt DateTime @default(now())
+}
